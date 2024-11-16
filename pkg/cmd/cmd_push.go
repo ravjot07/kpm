@@ -43,28 +43,80 @@ func NewPushCmd(kpmcli *client.KpmClient) *cli.Command {
 		},
 	}
 }
-
 func KpmPush(c *cli.Context, kpmcli *client.KpmClient) error {
-	localTarPath := c.String(FLAG_TAR_PATH)
-	ociUrl := c.Args().First()
-
-	var err error
-
-	if len(localTarPath) == 0 {
-		// If the tar package to be pushed is not specified,
-		// the current kcl package is packaged into tar and pushed.
-		err = pushCurrentPackage(ociUrl, c.Bool(FLAG_VENDOR), kpmcli)
-	} else {
-		// Else push the tar package specified.
-		err = pushTarPackage(ociUrl, localTarPath, c.Bool(FLAG_VENDOR), kpmcli)
-	}
-
+	// Load the KCL package
+	pkgPath := "."
+	kclPkg, err := pkg.LoadKclPkg(pkgPath)
 	if err != nil {
 		return err
 	}
 
+	// Check required fields
+	if kclPkg.ModFile.Pkg.Name == "" {
+		return fmt.Errorf("missing 'name' field in kcl.mod")
+	}
+	if kclPkg.ModFile.Pkg.Version == "" {
+		return fmt.Errorf("missing 'version' field in kcl.mod")
+	}
+
+	localTarPath := c.String(FLAG_TAR_PATH)
+	ociUrl := c.Args().First()
+
+	var pushErr error
+
+	if len(localTarPath) == 0 {
+		// If the tar package to be pushed is not specified,
+		// package the current KCL package into a tarball and push it.
+		pushErr = pushCurrentPackage(ociUrl, c.Bool(FLAG_VENDOR), kpmcli)
+	} else {
+		// Otherwise, push the specified tar package.
+		pushErr = pushTarPackage(ociUrl, localTarPath, c.Bool(FLAG_VENDOR), kpmcli)
+	}
+
+	if pushErr != nil {
+		return pushErr
+	}
+
 	return nil
 }
+
+// func KpmPush(c *cli.Context, kpmcli *client.KpmClient) error {
+
+// 	// Load the KCL package
+//     pkgPath := "."
+//     kclPkg, err := pkg.LoadKclPkg(pkgPath, opt.InitOptions{})
+//     if err != nil {
+//         return err
+//     }
+
+//     // Check required fields
+//     if kclPkg.MetaData.Name == "" {
+//         return fmt.Errorf("missing 'name' field in kcl.mod")
+//     }
+//     if kclPkg.MetaData.Version == "" {
+//         return fmt.Errorf("missing 'version' field in kcl.mod")
+//     }
+
+// 	localTarPath := c.String(FLAG_TAR_PATH)
+// 	ociUrl := c.Args().First()
+
+// 	var err error
+
+// 	if len(localTarPath) == 0 {
+// 		// If the tar package to be pushed is not specified,
+// 		// the current kcl package is packaged into tar and pushed.
+// 		err = pushCurrentPackage(ociUrl, c.Bool(FLAG_VENDOR), kpmcli)
+// 	} else {
+// 		// Else push the tar package specified.
+// 		err = pushTarPackage(ociUrl, localTarPath, c.Bool(FLAG_VENDOR), kpmcli)
+// 	}
+
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	return nil
+// }
 
 // genDefaultOciUrlForKclPkg will generate the default oci url from the current package.
 func genDefaultOciUrlForKclPkg(pkg *pkg.KclPkg, kpmcli *client.KpmClient) (string, error) {
